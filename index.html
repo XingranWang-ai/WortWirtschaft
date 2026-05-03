@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="WortWirtschaft 是一个德语学习返钱 demo：答对词汇题赚取虚拟欧元，再用奖励在虚拟商店消费，把即时反馈变成持续学习动力。">
+  <meta property="og:title" content="WortWirtschaft · 德语学习返钱局">
+  <meta property="og:description" content="用虚拟资产、连胜奖励和商店消费，把德语词汇练习变成一套更有反馈感的学习循环。">
+  <meta property="og:type" content="website">
   <title>德语返钱局</title>
   <style>
     :root {
@@ -585,7 +589,7 @@
 
     .shop-tabs {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 16px;
     }
@@ -739,6 +743,151 @@
       opacity: 1;
     }
 
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .72);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      width: min(560px, calc(100vw - 40px));
+      max-height: 85vh;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, #0f1d30, #0a1522);
+      box-shadow: var(--shadow);
+      padding: 28px;
+      transform: translateY(12px);
+      transition: transform .22s ease;
+    }
+
+    .modal-overlay.open .modal {
+      transform: translateY(0);
+    }
+
+    .modal h2 {
+      margin: 0 0 20px;
+      color: var(--gold);
+      font-size: 1.35rem;
+    }
+
+    .modal-close {
+      float: right;
+      width: 36px;
+      height: 36px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.04);
+      color: #ccc;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: background .18s ease, color .18s ease;
+    }
+
+    .modal-close:hover,
+    .modal-close:focus-visible {
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      outline: none;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.03);
+    }
+
+    .stat-card .label {
+      color: var(--muted);
+      font-size: .85rem;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .value {
+      color: #ffe3aa;
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .stat-card .sub {
+      color: var(--muted);
+      font-size: .8rem;
+      margin-top: 4px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .setting-row .label {
+      color: #d8cdb9;
+      font-weight: 700;
+    }
+
+    .setting-row .hint {
+      color: var(--muted);
+      font-size: .85rem;
+      margin-top: 3px;
+    }
+
+    .danger-button {
+      min-height: 40px;
+      border: 1px solid rgba(239, 123, 115, .5);
+      border-radius: var(--radius);
+      background: rgba(239, 123, 115, .12);
+      color: #ef7b73;
+      cursor: pointer;
+      font-weight: 800;
+      padding: 0 16px;
+      transition: background .18s ease;
+    }
+
+    .danger-button:hover,
+    .danger-button:focus-visible {
+      background: rgba(239, 123, 115, .24);
+      outline: none;
+    }
+
+    .checkin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(111, 209, 140, .15);
+      color: var(--green);
+      font-weight: 800;
+      font-size: .88rem;
+    }
+
     @media (max-width: 1180px) {
       .grid {
         grid-template-columns: 1fr 1fr;
@@ -834,6 +983,14 @@
 
       .transaction-amount {
         grid-column: 2;
+      }
+
+      .modal {
+        padding: 20px;
+      }
+
+      .stat-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -965,6 +1122,7 @@
           <button class="tab active" type="button" data-filter="all">全部</button>
           <button class="tab" type="button" data-filter="drink">饮品</button>
           <button class="tab" type="button" data-filter="snack">甜点</button>
+          <button class="tab" type="button" data-filter="stationery">文具</button>
           <button class="tab" type="button" data-filter="experience">体验</button>
         </div>
         <div class="shop-grid" id="shopGrid"></div>
@@ -974,37 +1132,142 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <div class="modal-overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-label="学习统计">
+    <div class="modal">
+      <button class="modal-close" id="statsClose" type="button" aria-label="关闭">✕</button>
+      <h2>学习统计</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="label">总答题数</div>
+          <div class="value" id="statsTotal">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">正确率</div>
+          <div class="value" id="statsAccuracy">0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">最高连对</div>
+          <div class="value" id="statsBestStreak">0</div>
+          <div class="sub">题</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">当前连对</div>
+          <div class="value" id="statsStreak">0</div>
+          <div class="sub">题</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">累计收入</div>
+          <div class="value" id="statsEarned">€0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">累计消费</div>
+          <div class="value" id="statsSpent">€0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">已购商品</div>
+          <div class="value" id="statsPurchases">0</div>
+          <div class="sub">件</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">待复习词</div>
+          <div class="value" id="statsReview">0</div>
+          <div class="sub">个</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="settingsOverlay" role="dialog" aria-modal="true" aria-label="设置">
+    <div class="modal">
+      <button class="modal-close" id="settingsClose" type="button" aria-label="关闭">✕</button>
+      <h2>设置</h2>
+      <div class="setting-row">
+        <div>
+          <div class="label">重置所有数据</div>
+          <div class="hint">清空余额、答题记录和已购商品</div>
+        </div>
+        <button class="danger-button" id="settingsReset" type="button">全部重置</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="label">关于德语返钱局</div>
+          <div class="hint">v1.1 · 用多巴胺驱动德语学习</div>
+        </div>
+      </div>
+      <p style="color:var(--muted);font-size:.86rem;margin-top:18px;">
+        德语返钱局是一个游戏化学习工具。答对题目赚取虚拟欧元，在商店购买奖励物品。<br><br>
+        题目涵盖 A1 到 B1 难度，适合德语初学者至中级学习者。每天坚持学习，连续答对可获得加成奖励。
+      </p>
+    </div>
+  </div>
+
   <script>
     const STORE_KEY = "germanCashbackDemo.v1";
     const DAILY_GOAL = 12;
     const BASE_REWARD = 0.5;
 
     const words = [
-      { id: 2387, level: "A2", word: "vorstellen", answer: "介绍；推荐", options: ["介绍；推荐", "忘记；遗忘", "准备；准备好", "代表；参加"] },
       { id: 1942, level: "A1", word: "der Kaffee", answer: "咖啡", options: ["咖啡", "火车站", "雨伞", "账单"] },
       { id: 2048, level: "A1", word: "lernen", answer: "学习", options: ["旅行", "学习", "等待", "购买"] },
-      { id: 3150, level: "A2", word: "die Gelegenheit", answer: "机会", options: ["机会", "速度", "城市", "习惯"] },
       { id: 4501, level: "A1", word: "bezahlen", answer: "付款", options: ["付款", "睡觉", "打开", "唱歌"] },
-      { id: 5508, level: "A2", word: "sich erinnern", answer: "记得；回忆", options: ["记得；回忆", "丢失", "相信", "借出"] },
-      { id: 6024, level: "B1", word: "die Veränderung", answer: "变化", options: ["变化", "借口", "菜单", "邻居"] },
       { id: 6391, level: "A1", word: "müde", answer: "疲惫的", options: ["疲惫的", "昂贵的", "圆形的", "安静的"] },
+      { id: 8119, level: "A1", word: "heute Abend", answer: "今晚", options: ["今晚", "上周", "明年", "立刻"] },
+      { id: 9640, level: "A1", word: "genießen", answer: "享受", options: ["享受", "忘记", "修理", "相信"] },
+      { id: 1101, level: "A1", word: "das Buch", answer: "书", options: ["书", "面包", "窗户", "桌子"] },
+      { id: 1202, level: "A1", word: "die Schule", answer: "学校", options: ["学校", "超市", "厨房", "花园"] },
+      { id: 1303, level: "A1", word: "essen", answer: "吃", options: ["吃", "跑步", "画画", "飞行"] },
+      { id: 1404, level: "A1", word: "trinken", answer: "喝", options: ["喝", "写", "跳舞", "唱歌"] },
+      { id: 1505, level: "A1", word: "das Wasser", answer: "水", options: ["水", "面包", "牛奶", "果汁"] },
+      { id: 1606, level: "A1", word: "die Katze", answer: "猫", options: ["猫", "狗", "鱼", "鸟"] },
+      { id: 1707, level: "A1", word: "der Tisch", answer: "桌子", options: ["桌子", "椅子", "床", "门"] },
+      { id: 1808, level: "A1", word: "die Blume", answer: "花", options: ["花", "树", "草", "叶子"] },
+      { id: 1909, level: "A1", word: "schlafen", answer: "睡觉", options: ["睡觉", "读书", "工作", "游泳"] },
+      { id: 2010, level: "A1", word: "groß", answer: "大的", options: ["大的", "小的", "快的", "冷的"] },
+
+      { id: 2387, level: "A2", word: "vorstellen", answer: "介绍；推荐", options: ["介绍；推荐", "忘记；遗忘", "准备；准备好", "代表；参加"] },
+      { id: 3150, level: "A2", word: "die Gelegenheit", answer: "机会", options: ["机会", "速度", "城市", "习惯"] },
+      { id: 5508, level: "A2", word: "sich erinnern", answer: "记得；回忆", options: ["记得；回忆", "丢失", "相信", "借出"] },
       { id: 7114, level: "A2", word: "ausgeben", answer: "花费；支出", options: ["花费；支出", "上交", "搬家", "照顾"] },
       { id: 7730, level: "A2", word: "die Belohnung", answer: "奖励", options: ["奖励", "风险", "报纸", "路线"] },
-      { id: 8119, level: "A1", word: "heute Abend", answer: "今晚", options: ["今晚", "上周", "明年", "立刻"] },
-      { id: 8582, level: "B1", word: "durchhalten", answer: "坚持下去", options: ["坚持下去", "关上", "比较", "邀请"] },
       { id: 9017, level: "A2", word: "die Rechnung", answer: "账单", options: ["账单", "护照", "键盘", "森林"] },
-      { id: 9640, level: "A1", word: "genießen", answer: "享受", options: ["享受", "忘记", "修理", "相信"] },
+      { id: 1156, level: "A2", word: "der Wunsch", answer: "愿望", options: ["愿望", "证据", "声音", "压力"] },
+      { id: 2101, level: "A2", word: "die Erfahrung", answer: "经验；经历", options: ["经验；经历", "危险", "建议", "消息"] },
+      { id: 2202, level: "A2", word: "vergleichen", answer: "比较", options: ["比较", "忘记", "购买", "讲述"] },
+      { id: 2303, level: "A2", word: "die Umgebung", answer: "环境；周围", options: ["环境；周围", "工具", "答案", "距离"] },
+      { id: 2404, level: "A2", word: "sich freuen auf", answer: "期待；盼望", options: ["期待；盼望", "害怕", "放弃", "思考"] },
+      { id: 2505, level: "A2", word: "der Eindruck", answer: "印象", options: ["印象", "收入", "入口", "出口"] },
+      { id: 2606, level: "A2", word: "enttäuscht", answer: "失望的", options: ["失望的", "满意的", "紧张的", "好奇的"] },
+      { id: 2707, level: "A2", word: "die Lösung", answer: "解决方案", options: ["解决方案", "问题", "考试", "任务"] },
+      { id: 2808, level: "A2", word: "bestellen", answer: "订购；点餐", options: ["订购；点餐", "取消", "修理", "打扫"] },
+
+      { id: 6024, level: "B1", word: "die Veränderung", answer: "变化", options: ["变化", "借口", "菜单", "邻居"] },
+      { id: 8582, level: "B1", word: "durchhalten", answer: "坚持下去", options: ["坚持下去", "关上", "比较", "邀请"] },
       { id: 1002, level: "B1", word: "sich lohnen", answer: "值得", options: ["值得", "迟到", "交换", "着陆"] },
-      { id: 1156, level: "A2", word: "der Wunsch", answer: "愿望", options: ["愿望", "证据", "声音", "压力"] }
+      { id: 3101, level: "B1", word: "die Unterstützung", answer: "支持", options: ["支持", "反对", "怀疑", "批评"] },
+      { id: 3202, level: "B1", word: "die Herausforderung", answer: "挑战", options: ["挑战", "礼物", "会议", "旅行"] },
+      { id: 3303, level: "B1", word: "vermeiden", answer: "避免", options: ["避免", "参加", "享受", "同意"] },
+      { id: 3404, level: "B1", word: "die Voraussetzung", answer: "前提条件", options: ["前提条件", "结果", "奖品", "规则"] },
+      { id: 3505, level: "B1", word: "überzeugen", answer: "说服", options: ["说服", "欺骗", "帮助", "干扰"] },
+      { id: 3606, level: "B1", word: "die Gewohnheit", answer: "习惯", options: ["习惯", "记忆", "计划", "梦想"] },
+      { id: 3707, level: "B1", word: "zuverlässig", answer: "可靠的", options: ["可靠的", "危险的", "便宜的", "快速的"] },
+      { id: 3808, level: "B1", word: "der Einfluss", answer: "影响", options: ["影响", "成功", "失败", "价格"] },
+      { id: 3909, level: "B1", word: "die Verantwortung", answer: "责任", options: ["责任", "自由", "安全", "健康"] },
+      { id: 4010, level: "B1", word: "sich beschweren", answer: "抱怨；投诉", options: ["抱怨；投诉", "表扬", "庆祝", "道歉"] }
     ];
 
     const shopItems = [
       { id: "latte", category: "drink", icon: "☕", name: "拿铁咖啡", desc: "提神醒脑，继续学习", price: 2.8 },
+      { id: "milchtee", category: "drink", icon: "🧋", name: "珍珠奶茶", desc: "甜蜜犒赏，续航力满满", price: 3.2 },
+      { id: "juice", category: "drink", icon: "🧃", name: "鲜榨橙汁", desc: "维C加持，清醒再战", price: 2.0 },
       { id: "cake", category: "snack", icon: "🍰", name: "黑森林蛋糕", desc: "奖励自己一下", price: 3.6 },
+      { id: "croissant", category: "snack", icon: "🥐", name: "黄油可颂", desc: "酥脆的德式早餐", price: 2.5 },
+      { id: "eis", category: "snack", icon: "🍦", name: "冰淇淋圆筒", desc: "夏天学德语也要清凉", price: 1.8 },
       { id: "notebook", category: "stationery", icon: "📓", name: "德语笔记本套装", desc: "好记性不如烂笔头", price: 4.9 },
       { id: "pen", category: "stationery", icon: "🖊️", name: "简约中性笔", desc: "书写每一个单词", price: 1.5 },
+      { id: "sticker", category: "stationery", icon: "⭐", name: "德语贴纸包", desc: "贴满你的学习角落", price: 2.2 },
       { id: "berlin-night", category: "experience", icon: "🌃", name: "柏林夜游体验票", desc: "感受柏林的夜晚", price: 18 },
-      { id: "fridge", category: "experience", icon: "🧲", name: "柏林冰箱贴", desc: "把回忆贴在生活里", price: 4.5 }
+      { id: "fridge", category: "experience", icon: "🧲", name: "柏林冰箱贴", desc: "把回忆贴在生活里", price: 4.5 },
+      { id: "concert", category: "experience", icon: "🎵", name: "德语音乐会门票", desc: "沉浸在德语旋律中", price: 12 }
     ];
 
     const defaultState = {
@@ -1012,13 +1275,22 @@
       streak: 0,
       answered: 0,
       purchases: [],
-      transactions: []
+      transactions: [],
+      bestStreak: 0,
+      correctCount: 0,
+      totalEarned: 0,
+      totalSpent: 0,
+      reviewQueue: [],
+      lastCheckinDate: null,
+      milestonesReached: []
     };
 
     let state = loadState();
     let currentIndex = 0;
     let answeredThisCard = false;
     let activeFilter = "all";
+    let questionsSinceReview = 0;
+    const MILESTONES = [10, 25, 50, 100, 200, 500];
 
     const el = {
       balance: document.querySelector("#balance"),
@@ -1044,7 +1316,14 @@
       toast: document.querySelector("#toast"),
       clearTransactions: document.querySelector("#clearTransactions"),
       resetButton: document.querySelector("#resetButton"),
-      ordersButton: document.querySelector("#ordersButton")
+      ordersButton: document.querySelector("#ordersButton"),
+      statsOverlay: document.querySelector("#statsOverlay"),
+      statsClose: document.querySelector("#statsClose"),
+      settingsOverlay: document.querySelector("#settingsOverlay"),
+      settingsClose: document.querySelector("#settingsClose"),
+      settingsReset: document.querySelector("#settingsReset"),
+      statsButton: document.querySelector('[aria-label="学习统计"]'),
+      settingsIconButton: document.querySelector('[aria-label="设置"]')
     };
 
     function loadState() {
@@ -1056,7 +1335,13 @@
           ...defaultState,
           ...parsed,
           purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
-          transactions: Array.isArray(parsed.transactions) ? parsed.transactions : []
+          transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+          reviewQueue: Array.isArray(parsed.reviewQueue) ? parsed.reviewQueue : [],
+          milestonesReached: Array.isArray(parsed.milestonesReached) ? parsed.milestonesReached : [],
+          bestStreak: typeof parsed.bestStreak === "number" ? parsed.bestStreak : 0,
+          correctCount: typeof parsed.correctCount === "number" ? parsed.correctCount : 0,
+          totalEarned: typeof parsed.totalEarned === "number" ? parsed.totalEarned : 0,
+          totalSpent: typeof parsed.totalSpent === "number" ? parsed.totalSpent : 0
         };
       } catch {
         return { ...defaultState };
@@ -1108,6 +1393,7 @@
       el.progressBar.style.width = `${(progress / DAILY_GOAL) * 100}%`;
       renderTransactions();
       renderShop();
+      if (el.statsOverlay.classList.contains("open")) openStats();
     }
 
     function renderCard() {
@@ -1171,11 +1457,15 @@
       if (option === card.answer) {
         const previousReward = BASE_REWARD;
         state.streak += 1;
+        if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+        state.correctCount += 1;
         const reward = getReward();
         state.balance = Number((state.balance + reward).toFixed(2));
+        state.totalEarned = Number((state.totalEarned + reward).toFixed(2));
         addTransaction("earn", `答对题目奖励：${card.word}`, reward);
         setFeedback("good", { reward, bonus: Number((reward - previousReward).toFixed(2)) });
         showToast(`收入 ${formatMoney(reward)}：${card.word}`);
+        checkMilestone();
       } else {
         button.classList.add("wrong");
         state.streak = 0;
@@ -1188,7 +1478,15 @@
     }
 
     function nextCard() {
-      currentIndex = (currentIndex + 1) % words.length;
+      questionsSinceReview += 1;
+      if (questionsSinceReview >= 5 && state.reviewQueue.length > 0) {
+        questionsSinceReview = 0;
+        const reviewIdx = state.reviewQueue.shift();
+        currentIndex = reviewIdx;
+        showToast("📝 复习时间！这是一道你标记过的词。");
+      } else {
+        currentIndex = (currentIndex + 1) % words.length;
+      }
       renderCard();
     }
 
@@ -1197,6 +1495,11 @@
       answeredThisCard = true;
       state.streak = 0;
       state.answered += 1;
+      const card = currentCard();
+      const idx = words.indexOf(card);
+      if (!state.reviewQueue.includes(idx)) {
+        state.reviewQueue.push(idx);
+      }
       [...el.answers.querySelectorAll(".answer")].forEach(button => button.disabled = true);
       setFeedback("mark");
       el.nextButton.disabled = false;
@@ -1267,6 +1570,7 @@
       }
 
       state.balance = Number((state.balance - item.price).toFixed(2));
+      state.totalSpent = Number((state.totalSpent + item.price).toFixed(2));
       state.purchases.push(item.id);
       addTransaction("spend", item.name, -item.price);
       saveState();
@@ -1291,6 +1595,56 @@
       utterance.rate = 0.82;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
+    }
+
+    function dailyCheckin() {
+      const today = new Date().toLocaleDateString("zh-CN");
+      if (state.lastCheckinDate === today) return;
+      state.lastCheckinDate = today;
+      state.balance = Number((state.balance + 0.30).toFixed(2));
+      state.totalEarned = Number((state.totalEarned + 0.30).toFixed(2));
+      addTransaction("earn", "每日签到奖励", 0.30);
+      saveState();
+      render();
+      showToast("☀ 每日签到奖励 +€0.30 已到账，今天也要认真学德语！");
+    }
+
+    function checkMilestone() {
+      for (const threshold of MILESTONES) {
+        if (state.answered >= threshold && !state.milestonesReached.includes(threshold)) {
+          state.milestonesReached.push(threshold);
+          const bonus = Number((threshold * 0.05).toFixed(2));
+          state.balance = Number((state.balance + bonus).toFixed(2));
+          addTransaction("earn", `里程碑奖励：${threshold} 题达成`, bonus);
+          saveState();
+          render();
+          showToast(`🎉 里程碑达成！完成 ${threshold} 题，奖励 ${formatMoney(bonus)}！`);
+          return;
+        }
+      }
+    }
+
+    function openStats() {
+      const total = state.answered || 0;
+      const accuracy = total > 0 ? Math.round((state.correctCount / total) * 100) : 0;
+      document.querySelector("#statsTotal").textContent = total;
+      document.querySelector("#statsAccuracy").textContent = accuracy + "%";
+      document.querySelector("#statsBestStreak").textContent = state.bestStreak;
+      document.querySelector("#statsStreak").textContent = state.streak;
+      document.querySelector("#statsEarned").textContent = formatMoney(state.totalEarned);
+      document.querySelector("#statsSpent").textContent = formatMoney(state.totalSpent);
+      document.querySelector("#statsPurchases").textContent = state.purchases.length;
+      document.querySelector("#statsReview").textContent = state.reviewQueue.length;
+      el.statsOverlay.classList.add("open");
+    }
+
+    function openSettings() {
+      el.settingsOverlay.classList.add("open");
+    }
+
+    function closeAllModals() {
+      el.statsOverlay.classList.remove("open");
+      el.settingsOverlay.classList.remove("open");
     }
 
     document.querySelectorAll(".tab").forEach(tab => {
@@ -1319,12 +1673,40 @@
       showToast(names.length ? `已拥有：${names.join("、")}` : "还没有订单，先去赚第一杯咖啡。");
     });
     el.resetButton.addEventListener("click", () => {
-      state = { ...defaultState, purchases: [], transactions: [] };
+      state = { ...defaultState, purchases: [], transactions: [], reviewQueue: [], milestonesReached: [] };
       saveState();
       render();
       renderCard();
       showToast("Demo 数据已重置。");
     });
+
+    el.statsButton.addEventListener("click", openStats);
+    el.statsClose.addEventListener("click", () => el.statsOverlay.classList.remove("open"));
+    el.statsOverlay.addEventListener("click", (e) => {
+      if (e.target === el.statsOverlay) el.statsOverlay.classList.remove("open");
+    });
+
+    el.settingsIconButton.addEventListener("click", openSettings);
+    el.settingsClose.addEventListener("click", () => el.settingsOverlay.classList.remove("open"));
+    el.settingsOverlay.addEventListener("click", (e) => {
+      if (e.target === el.settingsOverlay) el.settingsOverlay.classList.remove("open");
+    });
+
+    el.settingsReset.addEventListener("click", () => {
+      if (!confirm("确定要重置所有数据吗？余额、答题记录、已购商品都将清空，此操作不可撤销。")) return;
+      state = { ...defaultState, purchases: [], transactions: [], reviewQueue: [], milestonesReached: [] };
+      saveState();
+      render();
+      renderCard();
+      closeAllModals();
+      showToast("所有数据已重置。");
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAllModals();
+    });
+
+    dailyCheckin();
 
     render();
     renderCard();
